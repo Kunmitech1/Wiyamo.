@@ -556,9 +556,7 @@ footer{border-top:2px solid var(--dawn);padding:3rem 2rem;background:var(--ink)}
 </footer>
 
 <script>
-// ⚠ REPLACE THIS WITH YOUR GEMINI API KEY — DO NOT SHARE YOUR KEY WITH ANYONE
-const GEMINI_KEY = 'YOUR_GEMINI_API_KEY_HERE';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+// API calls go through /api/chat (Vercel serverless function — key is hidden server-side)
 const SYS = 'You are WIYAMO, a free UK immigration guidance assistant built specifically for Nigerian and African migrants. Deep knowledge of: UK visa routes (Health and Care Worker, Skilled Worker, Student, Family, Leave to Remain), Certificate of Sponsorship (CoS) — what it is, who can issue it, how to find licensed sponsors on the official UKVI Sponsor Register at gov.uk, how to approach them, timelines. Section 3C leave — what it is, why it matters, how it protects someone while an application is pending. The 28-day window for switching employers under a Skilled Worker visa. Extension applications — forms, fees, timelines. OISC-registered adviser directories. What is genuinely free vs what agents fraudulently charge for. Common scams. UK driving licence process and fast-tracking. Real 2026 UK visa fees: Student £558, IHS £776/year, TB test ~$95, Skilled Worker £819-£1,618, Health and Care Worker £284, Partner visa £2,064, Visitor £135. Always respond in plain English. Be direct, warm, specific. Never vague. Never guarantee outcomes. Cite gov.uk when relevant. Keep responses scannable with line breaks. Built by Oluwadarasimi, a 17-year-old from Abeokuta, because his mum needed this exact tool.';
 
 // ===== CURSOR =====
@@ -853,12 +851,14 @@ async function showResult(){
 }
 
 async function getRoute({loc, goal, status, emp, letter, concern}){
-  // Try Gemini first for a genuinely tailored answer
-  if(GEMINI_KEY !== 'YOUR_GEMINI_API_KEY_HERE'){
-    try{
+  // Call Gemini via secure server-side proxy
+  try{
       const prompt = `A user filling out WIYAMO's Situation Engine gave these answers:\nLocation: ${loc}\nGoal: ${goal}\nCurrent visa/leave status: ${status}\nEmployment situation: ${emp}\nHome Office letters received: ${letter}\nTheir own words on their biggest concern: "${concern}"\n\nGive them a short route title (max 6 words) on its own first line starting with "TITLE:", then a clear, specific, plain-English breakdown of: their situation, every legitimate option available to them right now, numbered next steps, real 2026 UK fees relevant to their case, and one direct warning if relevant about scams or deadlines. Reference their stated concern directly. End with a reminder this is information not legal advice. Keep it well under 280 words, scannable with line breaks, no markdown asterisks.`;
-      const r = await fetch(GEMINI_URL+'?key='+GEMINI_KEY,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],systemInstruction:{parts:[{text:SYS}]}})});
+      const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          messages:[{role:'user',parts:[{text:prompt}]}],
+          system:SYS
+        })});
       const d = await r.json();
       const text = d.candidates?.[0]?.content?.parts?.[0]?.text;
       if(text){
@@ -867,8 +867,7 @@ async function getRoute({loc, goal, status, emp, letter, concern}){
         const b = text.replace(/^TITLE:\s*.+$/m,'').trim();
         return { h, b };
       }
-    }catch(e){ /* fall through to hardcoded fallback below */ }
-  }
+  }catch(e){ /* fall through to hardcoded fallback below */ }
   return hardcodedRoute({loc, goal, status, emp, letter, concern});
 }
 
@@ -928,10 +927,12 @@ function addECG(){
 function removeECG(){ const e=document.getElementById('ecg'); if(e)e.remove(); }
 
 async function callGemini(msg){
-  if(GEMINI_KEY === 'YOUR_GEMINI_API_KEY_HERE') return 'Add your Gemini API key to the code to enable AI responses. Find the placeholder near the top of the script section.';
   try{
-    const r = await fetch(GEMINI_URL+'?key='+GEMINI_KEY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{role:'user',parts:[{text:msg}]}],systemInstruction:{parts:[{text:SYS}]}})});
+    const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages:[{role:'user',parts:[{text:msg}]}],
+        system:SYS
+      })});
     const d = await r.json();
     return d.candidates?.[0]?.content?.parts?.[0]?.text || 'WIYAMO is temporarily offline. Please try again.';
   }catch{ return 'Connection issue. Please check your internet and try again.'; }
@@ -972,11 +973,13 @@ async function runDetector(){
   vEl.textContent = 'Checking...';
   tEl.innerHTML = '<div class="ecg-wrap"><svg viewBox="0 0 56 20"><path class="ecg-path" d="M0 10 L8 10 L12 3 L16 17 L20 10 L28 10 L32 6 L36 14 L40 10 L56 10"/></svg></div>';
 
-  if(GEMINI_KEY !== 'YOUR_GEMINI_API_KEY_HERE'){
-    try{
+  try{
       const prompt = `Someone in the UK immigration process was told this, or quoted this:\n"${raw}"\n\nAssess whether this is a scam, overpriced, or legitimate, based on real UK immigration rules (CoS is free, no one can guarantee a visa, published Home Office fees, OISC regulation). Respond with a first line starting exactly with "SCAM" or "LEGIT" or "CAUTION", then on following lines a short, direct explanation (under 120 words) of why, what it should actually cost or whether it's free, and what to do next. No markdown asterisks.`;
-      const r = await fetch(GEMINI_URL+'?key='+GEMINI_KEY,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],systemInstruction:{parts:[{text:SYS}]}})});
+      const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          messages:[{role:'user',parts:[{text:prompt}]}],
+          system:SYS
+        })});
       const d = await r.json();
       const text = d.candidates?.[0]?.content?.parts?.[0]?.text;
       if(text){
@@ -989,8 +992,7 @@ async function runDetector(){
         tEl.innerHTML = rest;
         return;
       }
-    }catch(e){ /* fall through */ }
-  }
+  }catch(e){ /* fall through */ }
 
   // Fallback — keyword match
   const isScam = keywordDetect(txt);

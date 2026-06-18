@@ -7,21 +7,31 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
   }
 
-  const { messages, system } = req.body;
-  const contents = messages || [];
+  const { contents, systemInstruction, messages, system } = req.body;
+  
+  const geminiBody = {
+    contents: contents || messages || [],
+  };
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        systemInstruction: system ? { parts: [{ text: system }] } : undefined,
-      }),
-    }
-  );
+  if (systemInstruction) {
+    geminiBody.systemInstruction = systemInstruction;
+  } else if (system) {
+    geminiBody.systemInstruction = { parts: [{ text: system }] };
+  }
 
-  const data = await geminiRes.json();
-  return res.status(geminiRes.status).json(data);
+  try {
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+      }
+    );
+
+    const data = await geminiRes.json();
+    return res.status(geminiRes.status).json(data);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to reach Gemini API', details: err.message });
+  }
 }
